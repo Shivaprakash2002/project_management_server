@@ -1,70 +1,72 @@
+const mongoose = require('mongoose');
 const { createNotification, getNotifications, markAsRead } = require('../models/Notification');
-const { getAllUsers } = require('../models/User'); // Assuming you have this function
+const { getAllUsers } = require('../models/User');
 
 const initializeSocket = (io) => {
   io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
     socket.on('join', async ({ userId }) => {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId in join:', userId);
+        return;
+      }
+
       socket.join(userId);
-      const notifications = await getNotifications(userId);
-      socket.emit('notifications', notifications);
+      console.log(`User joined room: ${userId}`);
+
+      try {
+        const notifications = await getNotifications(userId);
+        socket.emit('notifications', notifications);
+      } catch (err) {
+        console.error('Error fetching notifications:', err);
+      }
     });
 
     socket.on('markAsRead', async ({ notificationId, userId }) => {
-      await markAsRead(notificationId, userId);
-      const notifications = await getNotifications(userId);
-      socket.emit('notifications', notifications);
+      if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(notificationId)) {
+        console.error('Invalid userId or notificationId in markAsRead');
+        return;
+      }
+
+      try {
+        await markAsRead(notificationId, userId);
+        const notifications = await getNotifications(userId);
+        socket.emit('notifications', notifications);
+      } catch (err) {
+        console.error('Error marking notification as read:', err);
+      }
     });
 
-    // Project event handlers
-    socket.on('projectCreated', async (project) => {
-      // Broadcast to all clients
-      socket.broadcast.emit('projectCreated', project);
-      
-      // Create notifications for all users
+    const notifyAllUsers = async (message) => {
       try {
         const users = await getAllUsers();
         for (const user of users) {
-          await createNotification(`New project created: ${project.name}`, user.id);
-          // Send updated notifications to connected user
-          io.to(user.id.toString()).emit('notifications', await getNotifications(user.id));
+          await createNotification(message, user.id);
+          const updated = await getNotifications(user.id);
+          io.to(user.id.toString()).emit('notifications', updated);
         }
-      } catch (error) {
-        console.error('Error creating notifications:', error);
+      } catch (err) {
+        console.error('Error sending notifications:', err);
       }
+    };
+
+    socket.on('projectCreated', async (project) => {
+      console.log('Project created:', project.name);
+      socket.broadcast.emit('projectCreated', project);
+      await notifyAllUsers(`New project created: ${project.name}`);
     });
 
     socket.on('projectUpdated', async (project) => {
-      // Broadcast to all clients
+      console.log('Project updated:', project.name);
       socket.broadcast.emit('projectUpdated', project);
-      
-      // Create notifications for all users
-      try {
-        const users = await getAllUsers();
-        for (const user of users) {
-          await createNotification(`Project updated: ${project.name}`, user.id);
-          // Send updated notifications to connected user
-          io.to(user.id.toString()).emit('notifications', await getNotifications(user.id));
-        }
-      } catch (error) {
-        console.error('Error creating notifications:', error);
-      }
+      await notifyAllUsers(`Project updated: ${project.name}`);
     });
 
     socket.on('projectDeleted', async ({ id, name }) => {
-      // Broadcast to all clients
+      console.log('Project deleted:', name);
       socket.broadcast.emit('projectDeleted', { id });
-      
-      // Create notifications for all users
-      try {
-        const users = await getAllUsers();
-        for (const user of users) {
-          await createNotification(`Project deleted: ${name}`, user.id);
-          // Send updated notifications to connected user
-          io.to(user.id.toString()).emit('notifications', await getNotifications(user.id));
-        }
-      } catch (error) {
-        console.error('Error creating notifications:', error);
-      }
+      await notifyAllUsers(`Project deleted: ${name}`);
     });
   });
 };

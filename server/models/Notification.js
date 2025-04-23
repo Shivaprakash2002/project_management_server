@@ -18,11 +18,17 @@ const getNotifications = async (userId) => {
   return await Notification.find({ user_id: userId }).sort({ created_at: -1 });
 };
 
-const markAsRead = async (id, userId) => {
-  await Notification.findOneAndUpdate(
-    { _id: id, user_id: userId },
-    { is_read: true }
+const markAsRead = async (notificationId, userId) => {
+  if (
+    !mongoose.Types.ObjectId.isValid(notificationId) ||
+    !mongoose.Types.ObjectId.isValid(userId)
+  ) return;
+
+  await Notification.updateOne(
+    { _id: notificationId, user_id: userId },
+    { $set: { read: true } }
   );
 };
+
 
 module.exports = { createNotification, getNotifications, markAsRead };

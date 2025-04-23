@@ -7,6 +7,8 @@ const { findUserByUsername , createUser} = require('../models/User');
 router.post('/login', async (req, res) => {
   const { username, password, role } = req.body;
   const user = await findUserByUsername(username);
+  
+  console.log('User:', user);
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.status(401).json({ message: 'Invalid credentials' });
@@ -19,7 +21,7 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign({ id: user.id, role: user.role }, "GOODWORK", {
     expiresIn: '1h',
   });
-  res.json({ token, role: user.role });
+  res.json({ token, role: user.role , id: user.id });
 });
 
 // Add this to your existing auth routes file
