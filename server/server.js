@@ -12,7 +12,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000', // Keep for local development
+      'https://project-management-beta-ashen.vercel.app' // Add your Vercel URL
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   },
 });
@@ -20,8 +23,15 @@ const io = new Server(server, {
 // Connect to MongoDB
 connectDB();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://project-management-beta-ashen.vercel.app'
+  ]
+}));
+
 app.use(express.json());
+
 app.use((req, res, next) => {
   req.io = io;
   next();
@@ -32,4 +42,5 @@ app.use('/api/projects', projectRoutes);
 
 initializeSocket(io);
 
-server.listen(5000, () => console.log('Server running on port 5000'));
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
