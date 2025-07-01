@@ -4,6 +4,8 @@ require('dotenv').config();
 const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI;
+
+    console.log('uri',uri);
     
     if (!uri) {
       throw new Error('MONGODB_URI environment variable is not defined');
